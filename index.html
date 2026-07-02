@@ -30,7 +30,7 @@ button.secondary{background:#444}
   <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
   <div id="status">Hors lobby</div>
 </div>
-<div id="screen" class="wait">Crée un lobby pour commencer</div>
+<div id="screen" class="wait">Créer un lobby pour commencer</div>
 
 <script type="module">
 import { joinRoom } from "https://unpkg.com/trystero@0.20.1/torrent.min.js";
@@ -68,20 +68,23 @@ const randomLobbyId = () => {
 };
 const now = () => Date.now();
 
+const getLobbyIdFromUrl = (value, base) => {
+  try {
+    return new URL(value, base).searchParams.get("lobby")?.trim() || "";
+  } catch {
+    return "";
+  }
+};
+
 const extractLobbyId = (value) => {
   const trimmed = value.trim();
   if (!trimmed) return "";
 
-  try {
-    const url = new URL(trimmed);
-    return url.searchParams.get("lobby")?.trim() || "";
-  } catch {}
+  const absoluteLobbyId = getLobbyIdFromUrl(trimmed);
+  if (absoluteLobbyId) return absoluteLobbyId;
 
   if (trimmed.includes("lobby=") || trimmed.startsWith("?")) {
-    try {
-      const url = new URL(trimmed, location.href);
-      return url.searchParams.get("lobby")?.trim() || "";
-    } catch {}
+    return getLobbyIdFromUrl(trimmed, location.href);
   }
 
   return trimmed;
@@ -105,7 +108,7 @@ const syncLobbyUrl = () => {
   history.replaceState({}, "", query ? `${location.pathname}?${query}` : location.pathname);
 };
 
-const leaveLobby = (message = "Crée un lobby pour commencer") => {
+const leaveLobby = (message = "Créer un lobby pour commencer") => {
   if (room) room.leave();
   room = null;
   peerIds.clear();
@@ -272,7 +275,7 @@ function render() {
 
 setLobbyLink();
 if (lobbyId) joinLobby();
-else setWaitingScreen("Crée un lobby pour commencer");
+else setWaitingScreen("Créer un lobby pour commencer");
 
 setInterval(render, 30);
 </script>
