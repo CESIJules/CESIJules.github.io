@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lobby Countdown GO</title>
+<title>Countdown GO</title>
 <style>
 html,body{margin:0;width:100%;height:100%;font-family:Arial,Helvetica,sans-serif;background:#111;color:#fff}
 body{display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -13,7 +13,6 @@ input,button{font-size:16px;border:none;border-radius:8px;padding:10px 12px}
 input{background:#1f1f1f;color:#fff;border:1px solid #444}
 button{background:#2d7bff;color:#fff;font-weight:700;cursor:pointer}
 button.secondary{background:#444}
-#shareLink{min-width:220px;flex:1}
 #status{font-size:14px;opacity:.9}
 #screen{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:35vw;font-weight:900;user-select:none;text-align:center;white-space:pre-line}
 .wait{font-size:min(7vw,48px)}
@@ -21,74 +20,32 @@ button.secondary{background:#444}
 </head>
 <body>
 <div id="controls">
-  <button id="createLobby" aria-label="Créer un lobby">Créer un lobby</button>
-  <input id="shareLink" aria-label="URL partageable du lobby" placeholder="Lien du lobby">
-  <button id="copyLink" class="secondary" aria-label="Copier le lien du lobby">Copier le lien</button>
   <label for="duration">Durée (s)</label>
   <input id="duration" aria-label="Durée du décompte en secondes" type="number" min="1" max="30" value="3" title="Durée du décompte (secondes)">
   <button id="goBtn" aria-label="Lancer le décompte">GO</button>
   <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
-  <div id="status">Hors lobby</div>
+  <div id="status">Prêt</div>
 </div>
-<div id="screen" class="wait">Créer un lobby pour commencer</div>
+<div id="screen" class="wait"></div>
 
 <script type="module">
-import { joinRoom } from "https://unpkg.com/trystero@0.20.1/torrent.min.js";
-
-const appId = "cesijules-countdown-go-v1";
-const qs = new URLSearchParams(location.search);
-const createLobbyBtn = document.getElementById("createLobby");
-const copyLinkBtn = document.getElementById("copyLink");
 const goBtn = document.getElementById("goBtn");
 const resetBtn = document.getElementById("resetBtn");
 const durationInput = document.getElementById("duration");
-const shareLinkInput = document.getElementById("shareLink");
 const statusEl = document.getElementById("status");
 const screen = document.getElementById("screen");
 
-let room;
-const peerIds = new Set();
-let lobbyId = qs.get("lobby") || "";
-let activeRound = null;
-let lastRoundAt = 0;
-let lastResetAt = 0;
+let activeCountdown = null;
 
 const MIN_DURATION_SECONDS = 1;
 const MAX_DURATION_SECONDS = 30;
 const DEFAULT_DURATION_SECONDS = 3;
 const PREPARATION_TIME_MS = 2500;
+const READY_STATUS = "Prêt";
+const READY_MESSAGE = "Prêt pour un décompte";
+const FINISHED_MESSAGE = "Terminé. Relancez un décompte !";
 
-const getLobbyUrl = (id = lobbyId) =>
-  id ? `${location.origin}${location.pathname}?lobby=${id}` : "";
-
-const randomLobbyId = () => {
-  const bytes = new Uint8Array(5);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-};
 const now = () => Date.now();
-
-const getLobbyIdFromUrl = (value, base) => {
-  try {
-    return new URL(value, base).searchParams.get("lobby")?.trim() || "";
-  } catch {
-    return "";
-  }
-};
-
-const extractLobbyId = (value) => {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  const absoluteLobbyId = getLobbyIdFromUrl(trimmed);
-  if (absoluteLobbyId) return absoluteLobbyId;
-
-  if (trimmed.includes("lobby=") || trimmed.startsWith("?")) {
-    return getLobbyIdFromUrl(trimmed, location.href);
-  }
-
-  return trimmed;
-};
 
 const setWaitingScreen = (msg = "En attente...") => {
   document.body.style.background = "#111";
@@ -96,162 +53,38 @@ const setWaitingScreen = (msg = "En attente...") => {
   screen.textContent = msg;
 };
 
-const setLobbyLink = () => {
-  shareLinkInput.value = getLobbyUrl();
+const updateStatus = (message = READY_STATUS) => {
+  statusEl.textContent = message;
 };
 
-const syncLobbyUrl = () => {
-  if (lobbyId) qs.set("lobby", lobbyId);
-  else qs.delete("lobby");
-
-  const query = qs.toString();
-  history.replaceState({}, "", query ? `${location.pathname}?${query}` : location.pathname);
-};
-
-const leaveLobby = (message = "Créer un lobby pour commencer") => {
-  if (room) room.leave();
-  room = null;
-  peerIds.clear();
-  activeRound = null;
-  lastRoundAt = 0;
-  lastResetAt = 0;
-  updateStatus();
+const resetCountdown = (message = READY_MESSAGE) => {
+  activeCountdown = null;
+  updateStatus(READY_STATUS);
   setWaitingScreen(message);
 };
 
-const joinLobby = () => {
-  if (!lobbyId) {
-    leaveLobby();
-    return;
-  }
-
-  if (room) room.leave();
-  room = null;
-  peerIds.clear();
-  activeRound = null;
-  lastRoundAt = 0;
-  lastResetAt = 0;
-  room = joinRoom({ appId }, lobbyId);
-
-  const [sendStart, onStart] = room.makeAction("start");
-  const [sendReset, onReset] = room.makeAction("reset");
-  const [sendSync, onSync] = room.makeAction("sync");
-
-  room.onPeerJoin((peerId) => {
-    peerIds.add(peerId);
-    updateStatus();
-    if (activeRound) sendSync(activeRound, peerId);
-  });
-
-  room.onPeerLeave((peerId) => {
-    peerIds.delete(peerId);
-    updateStatus();
-  });
-
-  const applyRound = (round) => {
-    if (!round || round.createdAt <= lastResetAt || round.createdAt <= lastRoundAt) return;
-    lastRoundAt = round.createdAt;
-    activeRound = round;
+const startCountdown = () => {
+  const seconds = Math.min(
+    MAX_DURATION_SECONDS,
+    Math.max(MIN_DURATION_SECONDS, Number(durationInput.value) || DEFAULT_DURATION_SECONDS)
+  );
+  durationInput.value = String(seconds);
+  activeCountdown = {
+    startAt: now() + PREPARATION_TIME_MS,
+    durationMs: seconds * 1000
   };
-
-  onStart(applyRound);
-  onSync(applyRound);
-  onReset((payload) => {
-    if (!payload || payload.at <= lastResetAt) return;
-    lastResetAt = payload.at;
-    activeRound = null;
-    setWaitingScreen("Prêt pour un nouveau décompte");
-  });
-
-  goBtn.onclick = () => {
-    const seconds = Math.min(
-      MAX_DURATION_SECONDS,
-      Math.max(MIN_DURATION_SECONDS, Number(durationInput.value) || DEFAULT_DURATION_SECONDS)
-    );
-    durationInput.value = String(seconds);
-    const round = {
-      createdAt: now(),
-      startAt: now() + PREPARATION_TIME_MS,
-      durationMs: seconds * 1000
-    };
-    applyRound(round);
-    sendStart(round);
-  };
-
-  resetBtn.onclick = () => {
-    const payload = { at: now() };
-    lastResetAt = payload.at;
-    activeRound = null;
-    setWaitingScreen("Prêt pour un nouveau décompte");
-    sendReset(payload);
-  };
-
-  updateStatus();
-  setWaitingScreen("Lobby prêt");
+  updateStatus("Décompte en cours");
 };
 
-const setLobby = (nextLobbyId) => {
-  lobbyId = nextLobbyId;
-  syncLobbyUrl();
-  setLobbyLink();
-
-  if (!lobbyId) {
-    leaveLobby();
-    return;
-  }
-
-  joinLobby();
-};
-
-function updateStatus() {
-  statusEl.textContent = lobbyId
-    ? `Lobby: ${lobbyId} • Connectés: ${peerIds.size + 1}`
-    : "Hors lobby";
-}
-
-createLobbyBtn.onclick = () => {
-  setLobby(randomLobbyId());
-};
-
-copyLinkBtn.onclick = async () => {
-  if (!shareLinkInput.value) return;
-  try {
-    await navigator.clipboard.writeText(shareLinkInput.value);
-    copyLinkBtn.textContent = "Copié";
-    setTimeout(() => (copyLinkBtn.textContent = "Copier le lien"), 1200);
-  } catch {
-    shareLinkInput.select();
-    copyLinkBtn.textContent = "Copie manuelle";
-    setTimeout(() => (copyLinkBtn.textContent = "Copier le lien"), 1200);
-  }
-};
-
-const applyLobbyFromInput = () => {
-  const nextLobbyId = extractLobbyId(shareLinkInput.value);
-  shareLinkInput.setCustomValidity("");
-
-  if (!nextLobbyId) {
-    setLobby("");
-    return;
-  }
-
-  setLobby(nextLobbyId);
-};
-
-shareLinkInput.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  applyLobbyFromInput();
-});
-
-shareLinkInput.addEventListener("blur", applyLobbyFromInput);
+goBtn.onclick = startCountdown;
+resetBtn.onclick = () => resetCountdown();
 
 function render() {
-  if (!activeRound) return;
+  if (!activeCountdown) return;
 
   const t = now();
-  const prep = activeRound.startAt - t;
-  const diff = activeRound.startAt + activeRound.durationMs - t;
+  const prep = activeCountdown.startAt - t;
+  const diff = activeCountdown.startAt + activeCountdown.durationMs - t;
 
   if (prep > 0) {
     document.body.style.background = "#111";
@@ -268,14 +101,11 @@ function render() {
     document.body.style.background = "#00b300";
     screen.textContent = "GO";
   } else {
-    activeRound = null;
-    setWaitingScreen("Terminé. Relancez un décompte !");
+    resetCountdown(FINISHED_MESSAGE);
   }
 }
 
-setLobbyLink();
-if (lobbyId) joinLobby();
-else setWaitingScreen("Créer un lobby pour commencer");
+setWaitingScreen(READY_MESSAGE);
 
 setInterval(render, 30);
 </script>
