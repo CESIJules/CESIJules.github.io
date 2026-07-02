@@ -26,7 +26,7 @@ button.secondary{background:#444}
   <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
   <div id="status">Prêt</div>
 </div>
-<div id="screen" class="wait">Prêt pour un décompte</div>
+<div id="screen" class="wait"></div>
 
 <script type="module">
 const goBtn = document.getElementById("goBtn");
@@ -41,6 +41,8 @@ const MIN_DURATION_SECONDS = 1;
 const MAX_DURATION_SECONDS = 30;
 const DEFAULT_DURATION_SECONDS = 3;
 const PREPARATION_TIME_MS = 2500;
+const READY_MESSAGE = "Prêt pour un décompte";
+const FINISHED_MESSAGE = "Terminé. Relancez un décompte !";
 
 const now = () => Date.now();
 
@@ -54,7 +56,7 @@ const updateStatus = (message = "Prêt") => {
   statusEl.textContent = message;
 };
 
-const resetCountdown = (message = "Prêt pour un décompte") => {
+const resetCountdown = (message = READY_MESSAGE) => {
   activeCountdown = null;
   updateStatus("Prêt");
   setWaitingScreen(message);
@@ -98,11 +100,11 @@ function render() {
     document.body.style.background = "#00b300";
     screen.textContent = "GO";
   } else {
-    resetCountdown("Terminé. Relancez un décompte !");
+    resetCountdown(FINISHED_MESSAGE);
   }
 }
 
-setWaitingScreen("Prêt pour un décompte");
+setWaitingScreen(READY_MESSAGE);
 
 setInterval(render, 30);
 </script>
