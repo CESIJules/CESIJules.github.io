@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Countdown GO</title>
+
+<style>
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family:Arial,Helvetica,sans-serif;
+}
+body{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#111;
+    color:white;
+    transition:background .2s;
+}
+
+#text{
+    font-size:35vw;
+    font-weight:900;
+    user-select:none;
+}
+
+.wait{
+    font-size:4vw!important;
+}
+</style>
+</head>
+<body>
+
+<div id="text" class="wait">Chargement...</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+
+// Temps de départ (timestamp en ms)
+let start = Number(params.get("t"));
+
+if(!start){
+    // Si aucune heure n'est donnée, on démarre dans 10 secondes
+    start = Date.now() + 10000;
+
+    // Recharge la page avec le timestamp pour partager le lien
+    location.replace(location.pathname + "?t=" + start);
+}
+
+const txt = document.getElementById("text");
+
+function update(){
+
+    const diff = start - Date.now();
+
+    if(diff > 3000){
+        document.body.style.background="#111";
+        txt.className="wait";
+        txt.innerHTML="Départ dans<br>"+Math.ceil(diff/1000)+" s";
+        return;
+    }
+
+    txt.className="";
+
+    if(diff>2000){
+        document.body.style.background="#d50000";
+        txt.textContent="3";
+    }else if(diff>1000){
+        document.body.style.background="#d50000";
+        txt.textContent="2";
+    }else if(diff>0){
+        document.body.style.background="#d50000";
+        txt.textContent="1";
+    }else if(diff>-1000){
+        document.body.style.background="#00b300";
+        txt.textContent="GO";
+    }else{
+        document.body.style.background="#111";
+        txt.textContent="";
+    }
+}
+
+setInterval(update,30);
+update();
+</script>
+
+</body>
+</html>
