@@ -20,12 +20,12 @@ button.secondary{background:#444}
 </head>
 <body>
 <div id="controls">
-  <button id="createLobby">Créer un lobby</button>
-  <input id="shareLink" readonly placeholder="Lien du lobby">
-  <button id="copyLink" class="secondary">Copier le lien</button>
-  <input id="duration" type="number" min="1" max="30" value="3" title="Durée du décompte (secondes)">
-  <button id="goBtn">GO</button>
-  <button id="resetBtn" class="secondary">Reset</button>
+  <button id="createLobby" aria-label="Créer un lobby">Créer un lobby</button>
+  <input id="shareLink" aria-label="URL partageable du lobby" readonly placeholder="Lien du lobby">
+  <button id="copyLink" class="secondary" aria-label="Copier le lien du lobby">Copier le lien</button>
+  <input id="duration" aria-label="Durée du décompte en secondes" type="number" min="1" max="30" value="3" title="Durée du décompte (secondes)">
+  <button id="goBtn" aria-label="Lancer le décompte">GO</button>
+  <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
   <div id="status">Hors lobby</div>
 </div>
 <div id="screen" class="wait">Crée un lobby pour commencer</div>
@@ -45,13 +45,22 @@ const statusEl = document.getElementById("status");
 const screen = document.getElementById("screen");
 
 let room;
-let peers = 0;
+const peerIds = new Set();
 let lobbyId = qs.get("lobby") || "";
 let activeRound = null;
 let lastRoundAt = 0;
 let lastResetAt = 0;
 
-const randomLobbyId = () => Math.random().toString(36).slice(2, 10);
+const MIN_DURATION_SECONDS = 1;
+const MAX_DURATION_SECONDS = 30;
+const DEFAULT_DURATION_SECONDS = 3;
+const PREPARATION_TIME_MS = 2500;
+
+const randomLobbyId = () => {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 10);
+};
 const now = () => Date.now();
 
 const setWaitingScreen = (msg = "En attente...") => {
@@ -72,6 +81,7 @@ const joinLobby = () => {
   if (!lobbyId) return;
 
   if (room) room.leave();
+  peerIds.clear();
   room = joinRoom({ appId }, lobbyId);
 
   const [sendStart, onStart] = room.makeAction("start");
@@ -79,13 +89,13 @@ const joinLobby = () => {
   const [sendSync, onSync] = room.makeAction("sync");
 
   room.onPeerJoin((peerId) => {
-    peers++;
+    peerIds.add(peerId);
     updateStatus();
     if (activeRound) sendSync(activeRound, peerId);
   });
 
-  room.onPeerLeave(() => {
-    peers = Math.max(0, peers - 1);
+  room.onPeerLeave((peerId) => {
+    peerIds.delete(peerId);
     updateStatus();
   });
 
@@ -105,11 +115,14 @@ const joinLobby = () => {
   });
 
   goBtn.onclick = () => {
-    const seconds = Math.min(30, Math.max(1, Number(durationInput.value) || 3));
+    const seconds = Math.min(
+      MAX_DURATION_SECONDS,
+      Math.max(MIN_DURATION_SECONDS, Number(durationInput.value) || DEFAULT_DURATION_SECONDS)
+    );
     durationInput.value = String(seconds);
     const round = {
       createdAt: now(),
-      startAt: now() + 2500,
+      startAt: now() + PREPARATION_TIME_MS,
       durationMs: seconds * 1000
     };
     applyRound(round);
@@ -130,7 +143,7 @@ const joinLobby = () => {
 
 function updateStatus() {
   statusEl.textContent = lobbyId
-    ? `Lobby: ${lobbyId} • Connectés: ${peers + 1}`
+    ? `Lobby: ${lobbyId} • Connectés: ${peerIds.size + 1}`
     : "Hors lobby";
 }
 
