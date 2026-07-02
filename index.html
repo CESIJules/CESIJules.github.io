@@ -8,6 +8,7 @@
 html,body{margin:0;width:100%;height:100%;font-family:Arial,Helvetica,sans-serif;background:#111;color:#fff}
 body{display:flex;align-items:center;justify-content:center;overflow:hidden}
 #controls{position:fixed;top:16px;left:16px;right:16px;z-index:2;background:rgba(0,0,0,.5);border:1px solid #333;border-radius:12px;padding:12px;backdrop-filter:blur(6px);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label{font-size:14px;opacity:.9}
 input,button{font-size:16px;border:none;border-radius:8px;padding:10px 12px}
 input{background:#1f1f1f;color:#fff;border:1px solid #444}
 button{background:#2d7bff;color:#fff;font-weight:700;cursor:pointer}
@@ -23,6 +24,7 @@ button.secondary{background:#444}
   <button id="createLobby" aria-label="Créer un lobby">Créer un lobby</button>
   <input id="shareLink" aria-label="URL partageable du lobby" readonly placeholder="Lien du lobby">
   <button id="copyLink" class="secondary" aria-label="Copier le lien du lobby">Copier le lien</button>
+  <label for="duration">Durée (s)</label>
   <input id="duration" aria-label="Durée du décompte en secondes" type="number" min="1" max="30" value="3" title="Durée du décompte (secondes)">
   <button id="goBtn" aria-label="Lancer le décompte">GO</button>
   <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
