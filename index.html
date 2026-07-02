@@ -41,6 +41,7 @@ const MIN_DURATION_SECONDS = 1;
 const MAX_DURATION_SECONDS = 30;
 const DEFAULT_DURATION_SECONDS = 3;
 const PREPARATION_TIME_MS = 2500;
+const READY_STATUS = "Prêt";
 const READY_MESSAGE = "Prêt pour un décompte";
 const FINISHED_MESSAGE = "Terminé. Relancez un décompte !";
 
@@ -52,13 +53,13 @@ const setWaitingScreen = (msg = "En attente...") => {
   screen.textContent = msg;
 };
 
-const updateStatus = (message = "Prêt") => {
+const updateStatus = (message = READY_STATUS) => {
   statusEl.textContent = message;
 };
 
 const resetCountdown = (message = READY_MESSAGE) => {
   activeCountdown = null;
-  updateStatus("Prêt");
+  updateStatus(READY_STATUS);
   setWaitingScreen(message);
 };
 
