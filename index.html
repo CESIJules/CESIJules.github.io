@@ -54,7 +54,7 @@ const updateStatus = (message = "Prêt") => {
   statusEl.textContent = message;
 };
 
-const resetCountdown = (message = "Prêt pour un nouveau décompte") => {
+const resetCountdown = (message = "Prêt pour un décompte") => {
   activeCountdown = null;
   updateStatus("Prêt");
   setWaitingScreen(message);
