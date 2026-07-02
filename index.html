@@ -22,7 +22,7 @@ button.secondary{background:#444}
 <body>
 <div id="controls">
   <button id="createLobby" aria-label="Créer un lobby">Créer un lobby</button>
-  <input id="shareLink" aria-label="URL partageable du lobby" readonly placeholder="Lien du lobby">
+  <input id="shareLink" aria-label="URL partageable du lobby" placeholder="Lien du lobby">
   <button id="copyLink" class="secondary" aria-label="Copier le lien du lobby">Copier le lien</button>
   <label for="duration">Durée (s)</label>
   <input id="duration" aria-label="Durée du décompte en secondes" type="number" min="1" max="30" value="3" title="Durée du décompte (secondes)">
@@ -30,7 +30,7 @@ button.secondary{background:#444}
   <button id="resetBtn" class="secondary" aria-label="Réinitialiser le décompte">Reset</button>
   <div id="status">Hors lobby</div>
 </div>
-<div id="screen" class="wait">Crée un lobby pour commencer</div>
+<div id="screen" class="wait">Créer un lobby pour commencer</div>
 
 <script type="module">
 import { joinRoom } from "https://unpkg.com/trystero@0.20.1/torrent.min.js";
@@ -58,12 +58,37 @@ const MAX_DURATION_SECONDS = 30;
 const DEFAULT_DURATION_SECONDS = 3;
 const PREPARATION_TIME_MS = 2500;
 
+const getLobbyUrl = (id = lobbyId) =>
+  id ? `${location.origin}${location.pathname}?lobby=${id}` : "";
+
 const randomLobbyId = () => {
   const bytes = new Uint8Array(5);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const now = () => Date.now();
+
+const getLobbyIdFromUrl = (value, base) => {
+  try {
+    return new URL(value, base).searchParams.get("lobby")?.trim() || "";
+  } catch {
+    return "";
+  }
+};
+
+const extractLobbyId = (value) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const absoluteLobbyId = getLobbyIdFromUrl(trimmed);
+  if (absoluteLobbyId) return absoluteLobbyId;
+
+  if (trimmed.includes("lobby=") || trimmed.startsWith("?")) {
+    return getLobbyIdFromUrl(trimmed, location.href);
+  }
+
+  return trimmed;
+};
 
 const setWaitingScreen = (msg = "En attente...") => {
   document.body.style.background = "#111";
@@ -72,18 +97,40 @@ const setWaitingScreen = (msg = "En attente...") => {
 };
 
 const setLobbyLink = () => {
-  if (!lobbyId) {
-    shareLinkInput.value = "";
-    return;
-  }
-  shareLinkInput.value = `${location.origin}${location.pathname}?lobby=${lobbyId}`;
+  shareLinkInput.value = getLobbyUrl();
+};
+
+const syncLobbyUrl = () => {
+  if (lobbyId) qs.set("lobby", lobbyId);
+  else qs.delete("lobby");
+
+  const query = qs.toString();
+  history.replaceState({}, "", query ? `${location.pathname}?${query}` : location.pathname);
+};
+
+const leaveLobby = (message = "Créer un lobby pour commencer") => {
+  if (room) room.leave();
+  room = null;
+  peerIds.clear();
+  activeRound = null;
+  lastRoundAt = 0;
+  lastResetAt = 0;
+  updateStatus();
+  setWaitingScreen(message);
 };
 
 const joinLobby = () => {
-  if (!lobbyId) return;
+  if (!lobbyId) {
+    leaveLobby();
+    return;
+  }
 
   if (room) room.leave();
+  room = null;
   peerIds.clear();
+  activeRound = null;
+  lastRoundAt = 0;
+  lastResetAt = 0;
   room = joinRoom({ appId }, lobbyId);
 
   const [sendStart, onStart] = room.makeAction("start");
@@ -143,6 +190,19 @@ const joinLobby = () => {
   setWaitingScreen("Lobby prêt");
 };
 
+const setLobby = (nextLobbyId) => {
+  lobbyId = nextLobbyId;
+  syncLobbyUrl();
+  setLobbyLink();
+
+  if (!lobbyId) {
+    leaveLobby();
+    return;
+  }
+
+  joinLobby();
+};
+
 function updateStatus() {
   statusEl.textContent = lobbyId
     ? `Lobby: ${lobbyId} • Connectés: ${peerIds.size + 1}`
@@ -150,11 +210,7 @@ function updateStatus() {
 }
 
 createLobbyBtn.onclick = () => {
-  lobbyId = randomLobbyId();
-  qs.set("lobby", lobbyId);
-  history.replaceState({}, "", `${location.pathname}?${qs.toString()}`);
-  setLobbyLink();
-  joinLobby();
+  setLobby(randomLobbyId());
 };
 
 copyLinkBtn.onclick = async () => {
@@ -169,6 +225,26 @@ copyLinkBtn.onclick = async () => {
     setTimeout(() => (copyLinkBtn.textContent = "Copier le lien"), 1200);
   }
 };
+
+const applyLobbyFromInput = () => {
+  const nextLobbyId = extractLobbyId(shareLinkInput.value);
+  shareLinkInput.setCustomValidity("");
+
+  if (!nextLobbyId) {
+    setLobby("");
+    return;
+  }
+
+  setLobby(nextLobbyId);
+};
+
+shareLinkInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  applyLobbyFromInput();
+});
+
+shareLinkInput.addEventListener("blur", applyLobbyFromInput);
 
 function render() {
   if (!activeRound) return;
@@ -199,7 +275,7 @@ function render() {
 
 setLobbyLink();
 if (lobbyId) joinLobby();
-else setWaitingScreen("Crée un lobby pour commencer");
+else setWaitingScreen("Créer un lobby pour commencer");
 
 setInterval(render, 30);
 </script>
