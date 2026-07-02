@@ -59,9 +59,9 @@ const DEFAULT_DURATION_SECONDS = 3;
 const PREPARATION_TIME_MS = 2500;
 
 const randomLobbyId = () => {
-  const bytes = new Uint8Array(6);
+  const bytes = new Uint8Array(5);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 10);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const now = () => Date.now();
 
@@ -102,7 +102,7 @@ const joinLobby = () => {
   });
 
   const applyRound = (round) => {
-    if (!round || round.createdAt < lastResetAt || round.createdAt < lastRoundAt) return;
+    if (!round || round.createdAt <= lastResetAt || round.createdAt <= lastRoundAt) return;
     lastRoundAt = round.createdAt;
     activeRound = round;
   };
@@ -110,7 +110,7 @@ const joinLobby = () => {
   onStart(applyRound);
   onSync(applyRound);
   onReset((payload) => {
-    if (!payload || payload.at < lastResetAt) return;
+    if (!payload || payload.at <= lastResetAt) return;
     lastResetAt = payload.at;
     activeRound = null;
     setWaitingScreen("Prêt pour un nouveau décompte");
